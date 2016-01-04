@@ -1,0 +1,177 @@
+def endLocation(latitude,longitude,bearing,distance):
+    import math
+    R = 6371 #Radius of the Earth in Kilometers
+    rad_brng = math.radians(bearing)    #Convert degrees to radians
+    d = float(distance * 1.852)   #Convert distance to float and from nautical miles to meters
+    r_lat = math.radians(latitude)    #Current latitude converted to radians
+    r_long = math.radians(longitude)    #Current longitude converted to radians
+
+    #Finding new lat & long based on entered distance and bearing (in radians)
+    r_lat2 = math.asin(math.sin(r_lat) * math.cos(d/R) + math.cos(r_lat) * math.sin(d/R) * math.cos(rad_brng))
+    r_long2 = r_long + math.atan2(math.sin(rad_brng) * math.sin(d/R) * math.cos(r_lat),math.cos(d/R) - math.sin(r_lat) * math.sin(r_lat2))
+
+    #Converting radians back to degrees
+    final_lat = math.degrees(r_lat2)
+    final_long = math.degrees(r_long2)
+
+    #Returning the lat& long of the end location.
+    return final_lat,final_long
+
+#Point A and B represent the start and end point. Each should be entered as a tuple with
+#latitude in the first position and longitude in the second ie.(lat,long)
+def GetBearing(pointA, pointB):
+
+    lat1 = math.radians(pointA[0])
+    lat2 = math.radians(pointB[0])
+    diffLong = math.radians(pointB[1] - pointA[1])
+    x = math.sin(diffLong) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1)* math.cos(lat2) * math.cos(diffLong))
+    initial_bearing = math.atan2(x, y)
+    initial_bearing = math.degrees(initial_bearing)
+    compass_bearing = (initial_bearing + 360) % 360
+    
+    return compass_bearing
+
+#Definition function to get the perpendicular bearing from what is returned by the GetBearing function
+def GetPerpVertBearing(bearing1,bearing2):
+
+    if bearing2 - bearing1 > 180:
+        bearing2 = bearing2 - 360
+        average = (bearing2 + bearing1)/2
+   
+        if average < 0:
+            average = average + 360
+            
+        else:
+            pass
+         
+    elif bearing1 - bearing2 < 180:
+        average = (bearing2 + bearing1)/2
+        
+    else:
+        bearing1 = bearing1 + 360
+        average = (bearing2 + bearing1)/2
+        
+    if average +90  < 360:
+        perpVertexBearing = average +90
+    else:
+        perpVertexBearing = average - 270
+    
+    return perpVertexBearing
+
+########################End of Definition Functions###########################
+
+#This Script creates hurricane tracks based on estimated location of a hurricane every 12 hours and the possible error in distance of that estimate over time.
+#Created 12/23/2015
+#Unclassified
+
+import arcpy,math,csv,numpy
+from arcpy import env
+env.workspace = r'D:\New folder\StudentGuideData\TemplateData.gdb\USA'
+env.overwriteOutput = 'True'
+
+csvInput = r'D:\New folder\StudentGuideData\Hurricane_Location.csv'
+fcOutput = 'HurricaneTrack'
+smoothOutput = 'HurricaneTrackSmoothed'
+
+segmentBearings = []
+polylist = []
+tuplelist =[]
+filelist = []
+sideBlist = []
+invertedB = []
+point = arcpy.Point()
+hurricaneArray = arcpy.Array()
+
+with open(csvInput, 'rb') as csvfile:
+    reader = csv.reader(csvfile)
+    reader.next()
+    for row in reader:
+        curtuple = (float(row[3]),float(row[2]))
+        filelist.append(row)
+        tuplelist.append(curtuple)
+
+#Appending what will be the first vertex of the polygon cone
+point.X = tuplelist[0][1] #Longitude
+point.Y = tuplelist[0][0] #Latitude
+hurricaneArray.add(point)
+
+#Creating a list of all the segmentBearings
+counter = 0        
+for item in filelist:
+    if float(item[3]) != float(tuplelist[-1][0]):
+        bearing = GetBearing(tuplelist[counter],tuplelist[counter+1])
+        segmentBearings.append(bearing)
+       
+    else:
+        pass
+
+    counter += 1
+
+counter = 0
+counter2 = 1
+for bear in segmentBearings:
+    #Creating perpendicular bearing based on the line segment before and after a vertex
+    if counter < len(segmentBearings)-1:
+        sideAperpbear = GetPerpVertBearing(bear,segmentBearings[counter+1])
+        sideBperpbear = sideAperpbear - 180
+
+    #Using the final line segment bearing to create perpindicular bearing of the last point
+    else:
+        if bear >= 90:
+            sideAperpbear = bear + 90
+
+        else:
+            sideAperpbear = bear - 270
+
+        sideBperpbear = sideAperpbear - 180           
+
+    #Creating the vertices for the first side of the polygon
+    if counter < len(tuplelist)-1:
+        sideA = endLocation(tuplelist[counter2][0],tuplelist[counter2][1],sideAperpbear,int(filelist[counter2][1]))
+        sideB = endLocation(tuplelist[counter2][0],tuplelist[counter2][1],sideBperpbear,int(filelist[counter2][1]))
+        sideBlist.append(sideB)
+
+        point.X = sideA[1]
+        point.Y = sideA[0]
+        hurricaneArray.add(point)      
+        counter2 += 1
+        counter += 1
+        
+    #When the else statement is executed we use the info at the end of all the lists
+    else:
+        sideA = endLocation(tuplelist[-1][0],tuplelist[-1][1],sideAperpbear,int(filelist[-1][1]))
+        point.X = sideA[1]
+        point.Y = sideA[0]
+        hurricaneArray.add(point)
+        sideB = endLocation(tuplelist[-1][0],tuplelist[-1][1],sideBperpbear,int(filelist[-1][1]))
+        sideBlist.append(sideB)
+
+#Creating the buffered area at the end of the track
+trackTop =  range(int(sideBperpbear),int(sideAperpbear))
+invertedTT = trackTop[::-1] 
+
+for bearing in invertedTT:
+    sideA = endLocation(tuplelist[-1][0],tuplelist[-1][1],bearing,int(filelist[-1][1]))
+    point.X = sideA[1]
+    point.Y = sideA[0]
+    hurricaneArray.add(point)
+
+#Creating the vertices for the other side of the hurricane track
+invertedB = sideBlist[::-1] 
+
+for coord in invertedB:
+    point.X = coord[1]
+    point.Y = coord[0]
+    hurricaneArray.add(point)
+    
+#Creating polygon object from the hurricane Array. Setting it to GCS WGS84
+polygon = arcpy.Polygon(hurricaneArray,'4269')
+polylist.append(polygon)
+hurricaneArray.removeAll()
+
+#Copying the polygon object to a feature class
+arcpy.CopyFeatures_management(polylist, fcOutput)
+
+#ArcGIS function to smooth the polygon so the edges are not as sharp
+arcpy.SmoothPolygon_cartography(polylist,smoothOutput,"BEZIER_INTERPOLATION","0 DecimalDegrees","FIXED_ENDPOINT","NO_CHECK")
