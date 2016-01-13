@@ -1,0 +1,198 @@
+#Ask user to hit the ENTER key to continue to cleanup computer
+raw_input("press ENTER to continue")
+
+#Importing Modules
+import arcpy, os, shutil, _winreg, time
+
+#Obtaining environment settings from windows OS.
+UserName = os.getenv('USERNAME')
+LocalESRI = os.getenv('LOCALAPPDATA') + '\\ESRI'
+RoamingESRI = os.getenv('APPDATA') + '\\ESRI'
+TEMPDIR = os.getenv('LOCALAPPDATA') + '\\Temp'
+ArcGISDocuments = os.getenv('USERPROFILE') + '\\Documents\\ArcGIS'
+ESRIDocuments = os.getenv('USERPROFILE') + '\\Documents\\ESRI'
+MyDesktop = os.getenv('USERPROFILE') + '\\Desktop'
+HomeShare = os.getenv('HOMESHARE')
+Downloads = os.getenv ('USERPROFILE') + '\\Downloads'
+
+print "computer environment settings have been obtained"
+
+#Deletes the Registry keys that show ArcMap Getting Started .MXD history
+
+try:
+    _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, r'Software\ESRI\Desktop10.2\ArcCatalog\Extensions')
+    _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, r'Software\ESRI\Desktop10.2\ArcMap\Extensions')
+    _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, r'Software\ESRI\Desktop10.2\ArcMap\Recent File List')
+    _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, r'Software\ESRI\Desktop10.2\ArcMap\Recent Geodatabase List')
+    _winreg.DeleteKey(_winreg.HKEY_CURRENT_USER, r'Software\ESRI\Desktop10.2\ArcToolbox\Settings')
+
+except:
+    pass#print "Registry Items are locked or no longer exists"
+
+print "ArcMap Getting Started Map Document history has been reset"
+
+#Deleting one of two ESRI folders created upon ESRI startup.
+try:
+    arcpy.Delete_management(LocalESRI)
+
+except:
+    pass#print "LocalESRI is locked or no longer exists"
+
+#Deleting files in the other ESRI folder. Folder can't be deleted from script as Python creates a lock on one of the file.
+for root, dirs, files in os.walk(RoamingESRI):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "ESRI normal folder has been emptied and the normal.mxt file deleted"
+
+#Emptying out Users Temp folder skipping locked files
+for root, dirs, files in os.walk(TEMPDIR):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked temp files in the " + TEMPDIR + " folder have been deleted."
+
+
+#Deletes the ArcGIS folder within My Documents folder. This folder contains the default.gdb. The default.gdb will be recreated the next time ArcMap is open
+try:
+    arcpy.Delete_management(ArcGISDocuments)
+
+except:
+    pass#print "Default.GDB is locked or no longer exists. Ensure you are closed out of ArcMap when running this script."
+
+#Deletes the ESRI folder within My Documents folder.
+try:
+    arcpy.Delete_management(ESRIDocuments)
+
+except:
+    pass# print "Documents is locked or no longer exists. Ensure you are closed out of ArcMap when running this script."
+
+
+
+#Deletes all files and folders on the Users Desktop that they created.
+for root, dirs, files in os.walk(MyDesktop):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked files on the desktop for user " + UserName + " have been deleted"
+
+#Deletes all files and folders in the Users Downloads folder.
+for root, dirs, files in os.walk(Downloads):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked files in the downloads folder for user " + UserName + " have been deleted"
+
+#Deletes all files and folders in the D:\ drive. DO NOT EVER POINT THIS OR ANY OF THE OTHER FILE PATH NAMES TO THE Z:\ DRIVE.
+for root, dirs, files in os.walk("D:\\"):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked files in the D: drive have been deleted."
+
+#Deletes all files and folders in the D:\ drive. DO NOT EVER POINT THIS OR ANY OF THE OTHER FILE PATH NAMES TO THE Z:\ DRIVE.
+for root, dirs, files in os.walk(HomeShare):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked files in the H: (HOME) drive have been deleted."
+
+#Empties the Recycle.bin in both C:\ & D:\ drive. !!!!DO NOT EVER POINT THIS OR ANY OF THE OTHER FILE PATH NAMES TO THE Z:\ DRIVE!!!!
+for root, dirs, files in os.walk("C:\\$Recycle.bin"):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+
+for root, dirs, files in os.walk("D:\\$Recycle.bin"):
+    for f in files:
+        try:
+            os.unlink(os.path.join(root,f))
+        except:
+            pass#print f + " was locked and could not be deleted. Deleted all editable files"
+            
+    for d in dirs:
+        try:
+            shutil.rmtree(os.path.join(root,d))
+        except:
+            pass#print d + " was locked and could not be deleted. Deleted all editable folders"
+
+print "All non-locked Recycling Bins have been emptied."
+
+
+
+time.sleep(10) # delays for 10 seconds
+
+
+#Delete the variable and modules from system memory.
+del UserName
+del LocalESRI 
+del RoamingESRI
+del TEMPDIR
+del ArcGISDocuments
+del ESRIDocuments
+del MyDesktop
+del HomeShare
+del Downloads
